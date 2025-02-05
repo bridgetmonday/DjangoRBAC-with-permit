@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Note Taking App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Toastify CSS -->
+  <link
+  rel="stylesheet"
+  type="text/css"
+  href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+/>
+<!-- Toastify JS -->
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+</head>
+<body class="bg-gray-100">
+
+  <!-- Main Container -->
+  <div class="p-4">
+    <!-- Header with Back Button and Modal Trigger -->
+    <div class="flex items-center justify-between mb-3">
+      
+<a href="{% url 'note_list' %}">
+
+  <?xml version="1.0" encoding="utf-8"?><!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+  <svg width="50px" height="20px" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="#000000" d="M224 480h640a32 32 0 1 1 0 64H224a32 32 0 0 1 0-64z"/><path fill="#000000" d="m237.248 512 265.408 265.344a32 32 0 0 1-45.312 45.312l-288-288a32 32 0 0 1 0-45.312l288-288a32 32 0 1 1 45.312 45.312L237.248 512z"/></svg>
+</a>
+
+      <!-- <button class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600" id="openModalBtn">
+        Open Modal
+      </button> -->
+   <!-- Modal Trigger SVG (Grid Icon) -->
+    <h1 class="capitalize">current role: {{role_type}}</h1>
+   {% if has_note_already %}
+   {% if role_type == 'admin' %}
+   
+   <div class="flex w-max item-center gap-2">
+
+     <svg id="openModalBtn" width="30px" height="30px" viewBox="-0.5 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg" class="cursor-pointer">
+       <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+       <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+       <g id="SVGRepo_iconCarrier">
+         <path d="M19 3.32001H16C14.8954 3.32001 14 4.21544 14 5.32001V8.32001C14 9.42458 14.8954 10.32 16 10.32H19C20.1046 10.32 21 9.42458 21 8.32001V5.32001C21 4.21544 20.1046 3.32001 19 3.32001Z" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+         <path d="M8 3.32001H5C3.89543 3.32001 3 4.21544 3 5.32001V8.32001C3 9.42458 3.89543 10.32 5 10.32H8C9.10457 10.32 10 9.42458 10 8.32001V5.32001C10 4.21544 9.10457 3.32001 8 3.32001Z" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+         <path d="M19 14.32H16C14.8954 14.32 14 15.2154 14 16.32V19.32C14 20.4246 14.8954 21.32 16 21.32H19C20.1046 21.32 21 20.4246 21 19.32V16.32C21 15.2154 20.1046 14.32 19 14.32Z" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+         <path d="M8 14.32H5C3.89543 14.32 3 15.2154 3 16.32V19.32C3 20.4246 3.89543 21.32 5 21.32H8C9.10457 21.32 10 20.4246 10 19.32V16.32C10 15.2154 9.10457 14.32 8 14.32Z" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+        </g>
+      </svg>
+      <h1>Invite user</h1>
+    </div>
+{%else %}
+{% endif %}
+{%else %}
+{% endif %}
+ </div>
+
+    <!-- Typing View (Note/Todo input) -->
+
+<form method="POST" action="{% if has_note_already %}{% url 'update_note' note.id %}{% else %}{% url 'create_note' %}{% endif %}">     {% csrf_token %}
+     
+        <input 
+            type="text" 
+            name="title"
+            {% if role_type == 'reader'%}readonly{% endif %}
+            id="first_name" 
+            class="bg-gray-50 border border-transparent text-gray-900 text-sm rounded-lg  
+                   focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 bg-transparent 
+                   border-transparent placeholder-gray-400 placeholder:text-4xl dark:text-gray-500 
+                   dark:focus:ring-blue-500 dark:focus:border-blue-500" 
+            placeholder="Title" value="{{note.title}}"
+            required 
+        />
+        
+        <textarea 
+            name="content"  
+            id="noteInput" 
+            rows="20"
+            {% if role_type == 'reader'%}readonly{% endif %}
+            
+            class="w-full p-4 border border-gray-300 rounded-lg resize-none" 
+            required 
+            placeholder="Type your note here..."
+        >{{note.content}}</textarea>
+        
+        <button
+            type="submit"
+            class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none 
+                   focus:ring-blue-300 font-medium rounded-lg text-sm w-full px-5 py-2.5 text-center 
+                   dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+        >
+        {% if has_note_already %} Update Note {% else %}Create Note{% endif %}
+            
+        </button>
+    </form>
+    
+    <!-- </div> -->
+
+    <!-- Modal Structure -->
+    <div id="myModal" class="fixed inset-0 bg-gray-500 bg-opacity-50 hidden justify-center items-center flex">
+      <div class="bg-white p-6 rounded-lg w-96">
+        <div class="flex justify-between items-center">
+
+          <h2 class="text-xl font-bold mb-4">User Info</h2>
+          <button class="" id="closeModalBtn">
+            X
+          </button>
+        </div>
+
+        <!-- Form for Email and Role -->
+        <form method="POST" action="{% if has_note_already %}{% url 'add_user_role' note.id %}{% else %}{% url 'create_note' %}{% endif %}">
+          {% csrf_token %}
+          <div class="mb-4">
+            <label for="username" class="block text-gray-700">Username</label>
+            <input type="username" name="username" id="username" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="Enter username" required>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-gray-700">Role</label>
+            <select class="w-full p-2 border border-gray-300 rounded-lg" name="role" id="role">
+              <option value="editor">Editor</option>
+              <option value="reader">Reader</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Submit</button>
+          </div>
+        </form>
+
+        <!-- Close Button -->
+        
+      </div>
+    </div>
+  </div>
+  
+  {% if messages %}
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      {% for message in messages %}
+        Toastify({
+          text: "{{ message }}",  // Display the Django message
+          duration: 3000,  // Time the toast stays visible
+          close: true,  // Allow closing the toast
+          gravity: "top",  // Position it at the top
+          position: "right",  // Position it on the right
+          stopOnFocus: true,  // Stop dismissing when focused
+          backgroundColor: "{% if message.tags == 'success' %} linear-gradient(to right, #00b09b, #96c93d) {% else %} linear-gradient(to right, #ff5f6d, #ffc371) {% endif %}"  // Customize background color based on message type
+        }).showToast();
+      {% endfor %}
+    });
+  </script>
+{% endif %}
+
+  <!-- Modal Toggle Script -->
+  <script>
+    const openModalBtn = document.getElementById('openModalBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modal = document.getElementById('myModal');
+
+    openModalBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+    });
+  </script>
+
+</body>
+</html>

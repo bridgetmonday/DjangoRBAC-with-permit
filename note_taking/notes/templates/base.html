@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Toastify CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css"
+    />
+    <!-- Toastify JS -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <title>Note Taking App</title>
+</head>
+<body class="bg-gray-100 text-gray-800">
+    <nav class="bg-blue-600 p-4 text-white">
+        <div class="flex items-center justify-between">
+
+            <div>
+                
+                <!-- <a href="{% url 'all_note_list' %}" class="mr-4">All Notes</a> -->
+                <a href="{% url 'all_note_list' %}" class="mr-4">All Notes</a>
+
+                <a href="{% url 'note_list' %}" class="mr-4">Your Notes</a>
+                <a href="{% url 'shared_note_list' %}" class="mr-4">Shared Notes</a>
+            </div>
+            <div>
+                <a href="{% url 'logout' %}">Logout</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container mx-auto mt-8">
+        {% block content %}
+        {% endblock %}
+    </div>
+    {% if messages %}
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          {% for message in messages %}
+            Toastify({
+              text: "{{ message }}",  // Display the Django message
+              duration: 3000,  // Time the toast stays visible
+              close: true,  // Allow closing the toast
+              gravity: "top",  // Position it at the top
+              position: "right",  // Position it on the right
+              stopOnFocus: true,  // Stop dismissing when focused
+              backgroundColor: "{% if message.tags == 'success' %} linear-gradient(to right, #00b09b, #96c93d) {% else %} linear-gradient(to right, #ff5f6d, #ffc371) {% endif %}"  // Customize background color based on message type
+            }).showToast();
+          {% endfor %}
+        });
+      </script>
+    {% endif %}
+  
+</body>
+</html>
