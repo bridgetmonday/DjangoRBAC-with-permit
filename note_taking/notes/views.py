@@ -1,3 +1,4 @@
+import asyncio
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, authenticate, logout
 from django.core.exceptions import ObjectDoesNotExist
@@ -5,53 +6,51 @@ from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from .models import Note, NoteAccess
 from django.contrib import messages
-import requests
 import uuid
+from permit import Permit
+from asgiref.sync import async_to_sync
 
-
+permit = Permit(
+    # you'll have to set the PDP url to the PDP you've deployed in the previous step
+    pdp="http://localhost:7766",
+    token="permit_key",
+)
 # this function helps to create a new resource instance of the note that was just created, Note: every note created has a unique id
 # you might want to create a new resource instance for each note created
 # if you get any error, you can check the permit.io documentation for more information
-def create_permit_instance(note_id):
-    url = "https://api.permit.io/v2/facts/{project_id}/{env_id}/resource_instances"
-    headers = {
-        "Authorization": "Bearer permit_key",
-        "Content-Type": "application/json",
-    }
 
-    payload = {"key": note_id, "resource": "note", "tenant": "default"}
 
-    response = requests.post(url, json=payload, headers=headers)
+async def create_permit_instance(note_id):
+    # resource_key = note_id  # Unique key for the resource
 
-    print(f"response status code is {response.status_code}")
-    print(
-        f"Response Payload is:\n\n{response.json()}"
-    )  # Assuming the response is in JSON format
+    try:
+        resource_instance = await permit.api.resource_instances.create(
+            instance_data={
+                "key": str(note_id),  # Unique instance identifier
+                "resource": "note",  # Resource type
+                "tenant": "default",  # Tenant name
+            }
+        )
+        print("Resource instance created successfully:")
+        print(resource_instance)
+    except Exception as e:
+        print(f"Failed to create resource instance: {e}")
 
 
 # this function helps to get the role of a user for a specific note instance
 # this would onlky help you retrive certain data of that user when you query the permit.io API for the user to get the permitted role if added to any instance based on the instanace id been looked up
-def get_permit_user_instance_data(request, user_id, resource_instance):
-    url = f"https://api.permit.io/v2/facts/{project_id}/{env_id}/role_assignments?user=user|{user_id}&resource_instance=note:{resource_instance}"
-    headers = {
-        "Authorization": "Bearer permit_key",
-        "Content-Type": "application/json",
-    }
 
-    response = requests.get(url, headers=headers)
-    print(f"response status code is {response.status_code} {response.text}")
-    print(
-        f"Response Payload is:\n\n{response.json()}"
-    )  # Assuming the response is in JSON format
 
-    if response.status_code == 200 or response.status_code == 201:
-        try:
-            return response.json()  # ✅ Return JSON data
-        except requests.exceptions.JSONDecodeError:
-            print("Error: Response is not a valid JSON")
-            return None
-    else:
-        print(f"Permit API Error: {response.status_code}, {response.text}")
+async def get_permit_user_instance_data(user_id, resource_instance):
+    try:
+        response = await permit.api.role_assignments.list(
+            user_key=f"user|{user_id}",  # Correct field name
+            resource_instance_key=f"note:{resource_instance}",  # Correct field name
+        )
+        print(f"response {response}")
+        return response
+    except Exception as e:
+        print(f"Permit API Error: {str(e)}")
         return None
 
 
@@ -61,67 +60,46 @@ def get_permit_user_instance_data(request, user_id, resource_instance):
 # Note: you must specify both the resource type and resource instance like this (note:{resource_instance}) else you would get and error
 
 
-def add_permit_user_to_note_instance(request, name, role, resource_instance):
-    print(f"resource id is {resource_instance}")
-    url = "https://api.permit.io/v2/facts/{project_id}/{env_id}/role_assignments"
+async def add_permit_user_to_note_instance(name, role, resource_instance):
+    print(f"Resource ID is {resource_instance}")
 
-    headers = {
-        "Authorization": "Bearer permit_key",
-        "Content-Type": "application/json",
-    }
+    try:
+        assignment_data = {
+            "user": f"user|{name}",
+            "role": role,
+            "resource_instance": f"note:{resource_instance}",
+        }
 
-    payload = {
-        "user": f"user|{name}",
-        "role": role,
-        "resource_instance": f"note:{resource_instance}",
-    }
+        await permit.api.role_assignments.assign(assignment_data)
+        print("User added successfully to Permit.io.")
+        return True
+    except Exception as e:
+        print(f"Permit API Error: {e}")
+        return False
 
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code == 200 or response.status_code == 201:
-        try:
-            messages.success(request, "User added successfully to Permit.io.")
-            return response  # ✅ Return JSON data
-        except requests.exceptions.JSONDecodeError:
 
-            print(f"Permit API Error: {response.status_code}, {response.text}")
-            messages.error(request, "Error: Response is not a valid JSON")
-            return None
-    else:
-        print(f"Permit API Error: {response.status_code}, {response.text}")
-        messages.error(
-            request, "An unexpected error occured why adding user to note instance"
+async def sync_user(user_id, email):
+    try:
+        # Sync user to Permit.io
+        user = await permit.api.users.sync({"key": f"user|{user_id}", "email": email})
+        print(f"✅ User synced successfully: {user}")
+
+        # Wait briefly to ensure Permit.io registers the user
+        await asyncio.sleep(1)
+
+        # Assign the role
+        await permit.api.users.assign_role(
+            {
+                "user": f"user|{user_id}",  # ✅ Correct string formatting
+                "role": "admin",
+                "tenant": "default",
+            }
         )
+        print(f"✅ Role 'admin' assigned to user {user_id}")
+        return user
+    except Exception as e:
+        print(f"❌ Error syncing user: {e}")
         return None
-
-
-# this gives the user a top level role access, not really defined to a specific note
-
-
-def add_permit_user(name, role):
-    url = "https://api.permit.io/v2/facts/{project_id}/{env_id}/users"
-    headers = {
-        "Authorization": "Bearer permit_key",
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "key": f"user|{name}",
-        "email": f"{name}@noteapp.com",
-        "first_name": f"{name}",
-        "last_name": f"{name}",
-        "role_assignments": [
-            {"role": role, "tenant": "default"},
-        ],
-    }
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    if response.status_code == 200 or response.status_code == 201:
-        print(f"User added successfully to Permit.io: {response.json()}")
-        return response  # Success
-
-    print(f"Error: {response.status_code}, {response.text}")
-    return None  # Ensure failure is correctly handled
 
 
 # this controller just help to sign the user up to your register
@@ -143,16 +121,9 @@ def register(request):
             messages.error(request, "Username already exists.")
             return redirect("register")
 
-        # Call Permit API (without passing `request`)
-        response = add_permit_user(username, "admin")
-
-        # If Permit API call fails, do NOT create user
-        if response is None:
-            messages.error(request, "User already exist on permit.io")
-            return redirect("register")
-
-        # Create user only if Permit API was successful
         user = User.objects.create_user(username=username, password=password)
+        async_to_sync(sync_user)(user.username, f"{user.username}@noteapp.com")
+        print(f"User created: {user.username} with id {user.id}")
         login(request, user)
         return redirect("note_list")
 
@@ -219,50 +190,51 @@ def user_logout(request):
 # it also checks if the user has access to the note
 # it also checks if the note id is valid
 # for shared notes, it makes use of the get_permit_user_instance_data function to get the user role
+
+
 @login_required
 def get_notes_by_id(request, note_id):
     # Validate UUID format
     try:
-        # This will raise a ValueError if the note_id is not a valid UUID
-        note_id = uuid.UUID(note_id)
+        note_id = uuid.UUID(note_id)  # Convert to UUID
     except ValueError:
         messages.error(request, "The provided note ID is not valid.")
-        return redirect("/")  # Or you can redirect to a more appropriate page.
+        return redirect("/")
 
-    # Now safely query the database
-    note = get_object_or_404(Note, id=note_id)
+    # Debug: Print to check UUID conversion
+    print(f"Converted Note ID: {note_id}")
 
-    # Check user's access to the note
+    # Get the note instance safely
+    try:
+        note = get_object_or_404(Note, id=note_id)
+    except Exception as e:
+        print(f"Error fetching note: {e}")
+        messages.error(request, "Note not found.")
+        return redirect("/")
+
+    # Check user's access
     if note.creator == request.user:
         role_type = "admin"
     else:
-        permit_response = get_permit_user_instance_data(
-            request, request.user.username, note_id
+        permit_response = asyncio.run(
+            get_permit_user_instance_data(request.user.username, note_id)
         )
 
         if permit_response:
             if isinstance(permit_response, list) and permit_response:
-                # Extract the highest role in case of multiple roles
-                user_roles = [
-                    entry.get("role") for entry in permit_response if "role" in entry
-                ]
+                user_roles = [entry.role for entry in permit_response]
+                role_hierarchy = ["admin", "editor", "reader"]
                 user_role = (
-                    max(
-                        user_roles, key=lambda r: ["admin", "editor", "reader"].index(r)
-                    )
+                    max(user_roles, key=lambda r: role_hierarchy.index(r))
                     if user_roles
                     else None
                 )
             else:
                 user_role = (
-                    permit_response.get("role")
-                    if isinstance(permit_response, dict)
-                    else None
+                    permit_response.role if hasattr(permit_response, "role") else None
                 )
 
-            role_hierarchy = ["admin", "editor", "reader"]
-
-            if user_role in role_hierarchy:
+            if user_role in ["admin", "editor", "reader"]:
                 role_type = user_role
             else:
                 messages.error(
@@ -272,8 +244,6 @@ def get_notes_by_id(request, note_id):
         else:
             messages.error(request, "You do not have access to this note.")
             return redirect("/")
-
-    users_with_roles = NoteAccess.objects.filter(note=note).select_related("user")
 
     return render(
         request,
@@ -454,7 +424,7 @@ def create_notes(request):
             return redirect("new_note")
 
         note = Note.objects.create(title=title, content=content, creator=request.user)
-        create_permit_instance(f"{note.id}")
+        asyncio.run(create_permit_instance(note.id))
         messages.success(request, "Note created successfully!")
         return redirect("note_list")
 
@@ -479,17 +449,15 @@ def new_note(request):
 
 
 # this controller helps to add a user role to a note
+
+
 def add_user_role(request, note_id):
-    note = get_object_or_404(
-        Note,
-        id=note_id,
-    )  # Ensure only creator can add roles
+    note = get_object_or_404(Note, id=note_id)
 
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         role = request.POST.get("role", "").strip()
 
-        # Check if the username and role are provided
         if not username or not role:
             messages.error(request, "Username and role are required.")
             return render(
@@ -498,7 +466,6 @@ def add_user_role(request, note_id):
                 {"note": note, "role_type": "admin", "has_note_already": True},
             )
 
-        # Check if the user exists in the database
         user = User.objects.filter(username=username).first()
         if not user:
             messages.error(request, "Username does not exist.")
@@ -508,15 +475,13 @@ def add_user_role(request, note_id):
                 {"note": note, "role_type": "admin", "has_note_already": True},
             )
 
-        # Proceed with adding the user to Permit.io
-        response = add_permit_user_to_note_instance(
-            request, user.username, role, note_id
+        # Correctly execute the async function in a sync context
+        success = async_to_sync(add_permit_user_to_note_instance)(
+            user.username, role, note_id
         )
 
-        # Check if the response was successful and display message
-        if response and (response.status_code == 200 or response.status_code == 201):
-            # Create or update the role in the local database
-            note_access, created = NoteAccess.objects.update_or_create(
+        if success:
+            NoteAccess.objects.update_or_create(
                 note=note,
                 user=user,
                 defaults={"role": role, "assigned_by": request.user},
